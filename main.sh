@@ -1,28 +1,35 @@
 #!/bin/bash
 set -e
 
-### НАСТРОЙКИ (ПРОВЕРЬ!)
+### НАСТРОЙКИ
 ROOT_PART="/dev/sdb3"
 EFI_PART="/dev/sda1"
 HOSTNAME="arch"
-TIMEZONE="Europe/Moscow"
-LOCALE="ru_RU.UTF-8"
+TIMEZONE="Asia/Krasnoyarsk"
+LOCALE="en_US.UTF-8"
+USERNAME="timex"
+PASSWORD="123"
 
-echo "=== Arch Linux installer ==="
+echo "=== ARCH INSTALLER ==="
 echo "ROOT: $ROOT_PART"
 echo "EFI : $EFI_PART"
 sleep 3
 
-### 1. Форматирование ROOT (ТОЛЬКО ОН!)
+### 1. Форматируем ТОЛЬКО ROOT
 mkfs.ext4 -F $ROOT_PART
 
-### 2. Монтирование
+### 2. Монтируем
 mount $ROOT_PART /mnt
 mkdir -p /mnt/boot/efi
 mount $EFI_PART /mnt/boot/efi
 
-### 3. Установка базовой системы
-pacstrap /mnt base linux linux-firmware nano networkmanager grub efibootmgr os-prober
+### 3. Установка системы + KDE
+pacstrap /mnt \
+  base linux linux-firmware \
+  nano sudo networkmanager \
+  grub efibootmgr os-prober \
+  xorg plasma kde-applications \
+  sddm
 
 ### 4. fstab
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -33,17 +40,26 @@ arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 hwclock --systohc
 
-sed -i "s/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/" /etc/locale.gen
 sed -i "s/#$LOCALE UTF-8/$LOCALE UTF-8/" /etc/locale.gen
 locale-gen
-
 echo "LANG=$LOCALE" > /etc/locale.conf
+
 echo "$HOSTNAME" > /etc/hostname
 
 systemctl enable NetworkManager
+systemctl enable sddm
 
-echo "root:root" | chpasswd
+### root пароль
+echo "root:$PASSWORD" | chpasswd
 
+### пользователь
+useradd -m -G wheel -s /bin/bash $USERNAME
+echo "$USERNAME:$PASSWORD" | chpasswd
+
+### sudo
+sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
+
+### GRUB
 sed -i 's/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
 
 grub-install --target=x86_64-efi \
@@ -58,7 +74,9 @@ EOF
 umount -R /mnt
 
 echo "=================================="
-echo " УСТАНОВКА ЗАВЕРШЕНА"
-echo " root пароль: root"
+echo " ГОТОВО!"
+echo " Пользователь: timex"
+echo " Пароль: 123"
+echo " KDE Plasma установлена"
 echo " Перезагрузи ПК"
 echo "=================================="
